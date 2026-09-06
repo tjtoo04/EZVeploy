@@ -1,0 +1,15 @@
+{
+  "name": "ezveploy-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "EZVeploy API — root panel over per-user rootless Docker daemons on a multi-tenant VPS",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/index.js",
+    "test": "node --test \"test/*.test.js\""
+  },
+  "dependencies": {
+    "fastify": "^5.0.0"
+  }
+}

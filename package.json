@@ -1,0 +1,16 @@
+{
+  "name": "ezveploy",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Root panel over per-user rootless Docker daemons on a multi-tenant VPS",
+  "workspaces": [
+    "server",
+    "ui"
+  ],
+  "scripts": {
+    "test": "npm -C server test",
+    "dev:server": "npm -C server start",
+    "dev:ui": "npm -C ui run dev",
+    "build": "npm -C ui run build"
+  }
+}

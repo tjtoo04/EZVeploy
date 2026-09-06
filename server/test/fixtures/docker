@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+# Fixture docker CLI for the test suite — simulates per-user rootless daemons
+# keyed on the --host unix socket path. Never run it on a real box.
+set -u
+
+HOST=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --host) HOST="${2:-}"; shift 2 ;;
+    *) break ;;
+  esac
+done
+
+case "$HOST" in
+  *user/1003/*)
+    # carol — daemon socket exists but the daemon is not running
+    echo "Cannot connect to the Docker daemon at unix://${HOST}. Is the docker daemon running?" >&2
+    exit 1
+    ;;
+  *user/1001/*)
+    # alice — healthy daemon with two containers
+    CMD="$1"; shift
+    case "$CMD" in
+      ps)
+        cat <<'EOF'
+{"ID":"a1b2c3d4e5f6","Names":"web","Image":"nginx:1.27","Status":"Up 3 hours","Ports":"0.0.0.0:8080->80/tcp"}
+{"ID":"f6g7h8i9j0k1","Names":"db","Image":"postgres:16","Status":"Up 3 hours","Ports":"5432/tcp"}
+EOF
+        exit 0
+        ;;
+      logs)
+        FOLLOW=0
+        NAME=""
+        while [ "$#" -gt 0 ]; do
+          case "$1" in
+            -f) FOLLOW=1 ;;
+            --tail) shift ;;
+            *) NAME="$1" ;;
+          esac
+          shift
+        done
+        case "$NAME" in
+          nope)
+            echo "Error: No such container: nope" >&2
+            exit 1
+            ;;
+          web)
+            if [ "$FOLLOW" = "1" ]; then
+              printf 'line one\nline two\nline three\n'
+              sleep 0.3
+              printf 'followed line four\n'
+              sleep 0.2
+              exit 0
+            fi
+            printf 'started container\nlistening on :80\n'
+            exit 0
+            ;;
+          *) exit 0 ;;
+        esac
+        ;;
+      stats)
+        NAME=""
+        while [ "$#" -gt 0 ]; do
+          case "$1" in
+            --no-stream) ;;
+            --format) shift ;;   # consumes the value that follows
+            *) NAME="$1" ;;
+          esac
+          shift
+        done
+        case "$NAME" in
+          nope)
+            echo "Error: No such container: nope" >&2
+            exit 1
+            ;;
+          *)
+            printf '[{"CONTAINER":"%s","CPU %%":"0.42%%","MEM USAGE":"12.5 MiB","MEM LIMIT":"3.9 GiB","MEM %%":"0.32%%","NET I/O":"1.2 kB / 3.4 kB"}]\n' "$NAME"
+            exit 0
+            ;;
+        esac
+        ;;
+      *) exit 0 ;;
+    esac
+    ;;
+  /var/run/docker.sock|*/var/run/docker.sock)
+    # root — the system daemon (admin group)
+    CMD="$1"; shift
+    case "$CMD" in
+      ps)
+        printf '%s\n' '{"ID":"aa11bb22cc33","Names":"captain","Image":"ezveploy/panel","Status":"Up 2 hours","Ports":"0.0.0.0:3999->3999/tcp"}'
+        exit 0
+        ;;
+      *) exit 0 ;;
+    esac
+    ;;
+  *)
+    # bob — daemon up, zero containers
+    exit 0
+    ;;
+esac
+exit 0

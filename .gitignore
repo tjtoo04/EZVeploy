@@ -1,0 +1,23 @@
+# runtime state
+server/data/
+server/data-dev/
+server/test/fixtures/.tmp-*
+*.log
+
+# node
+node_modules/
+
+# build output
+dist/
+
+# impeccable workspace (shots, drafts)
+.impeccable/
+
+# local envs (never commit credentials / script paths)
+.env
+.env.local
+
+# editor
+.DS_Store
+.idea/
+.vscode/

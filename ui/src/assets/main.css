@@ -1,0 +1,698 @@
+@import "primeicons/primeicons.css";
+
+/* ============================================================
+   EZVeploy world layer — "the box wall" (contract in index.html)
+   Board = exterior chrome. Tissue = content interiors.
+   ============================================================ */
+
+:root {
+ color-scheme: light dark;
+
+ /* board — kraft chrome in light, charred board in dark */
+ --board-950: light-dark(#8a7449, #171006);
+ --board-900: light-dark(#ece0c2, #20140a);
+ --board-800: light-dark(#d4bd8f, #2a1b0e);
+ --board-700: light-dark(#c9b182, #372416);
+ --board-600: light-dark(#96804f, #46301c);
+ --board-500: light-dark(#a28a5e, #5a4028);
+ --board-400: light-dark(#b39b6e, #6f5136);
+ --board-300: light-dark(#b39b6e, #876548);
+
+ --tissue-0: light-dark(#fdf7ec, #241b10);
+ --tissue-50: light-dark(#faf1df, #2a2014);
+ --tissue-100: light-dark(#f4e7cf, #32261a);
+ --tissue-300: light-dark(#decaa4, #463726);
+ --tissue-700: light-dark(#836c48, #a0875e);
+ --tissue-900: light-dark(#463726, #cdb38a);
+
+ --ink-0: light-dark(#ffffff, #1c1208);
+ --ink-50: light-dark(#3f3118, #f6eedd);
+ --ink-100: light-dark(#6b573f, #eadfc2);
+ --ink-300: light-dark(#5c4a26, #c9b48c);
+ --ink-500: light-dark(#5a4524, #9c8662);
+ --ink-700: light-dark(#6b573f, #cdb38a);
+ --ink-900: light-dark(#33240f, #f0e6d0);
+
+ --orange-400: light-dark(#9c4503, #ee913a);
+ --orange-500: light-dark(#b45309, #e0761e);
+ --orange-600: light-dark(#a34404, #c9610d);
+
+ --moss-400: light-dark(#3d6a24, #6e9e4f);
+ --moss-600: light-dark(#35611e, #4f7a36);
+ --rust-400: #c2512f;
+ --rust-350: light-dark(#8a2b0a, #cf6a45);
+ --rust-600: #8f3b22;
+ --amber-400: light-dark(#77520b, #c98a1b);
+
+ --hairline: light-dark(rgba(58, 36, 20, 0.35), rgba(240, 230, 208, 0.16));
+ /* the log viewport is a terminal — dark in both schemes */
+ --log-bg: light-dark(#463726, #1a120a);
+ --log-fg: light-dark(#faf1df, #f0e6d0);
+ --log-dim: light-dark(#decaa4, #b3a17c);
+
+ --font-caps:
+  "DejaVu Sans Condensed", "Arial Narrow", "DejaVu Sans", "Helvetica Neue",
+  sans-serif;
+ --font-mono:
+  "DejaVu Sans Mono", "Cascadia Mono", "SF Mono", "JetBrains Mono", Consolas,
+  monospace;
+ --font-body:
+  "DejaVu Sans", "Liberation Sans", "Segoe UI", system-ui, sans-serif;
+}
+
+* {
+ box-sizing: border-box;
+}
+
+html,
+body {
+ margin: 0;
+ height: 100%;
+}
+body {
+ font-family: var(--font-body);
+ background: var(--board-900);
+ color: var(--ink-50);
+}
+
+:focus-visible {
+ outline: 2px solid var(--orange-500);
+ outline-offset: 1px;
+}
+
+::selection {
+ background: var(--orange-500);
+ color: #33240f;
+}
+
+/* ---------- shell ---------- */
+
+.ez-shell {
+ min-height: 100vh;
+ display: flex;
+ flex-direction: column;
+}
+
+.masthead {
+ background: var(--board-800);
+ border-bottom: 1px solid var(--board-500);
+ border-top: 4px solid var(--board-950);
+ padding: 10px 28px;
+ display: flex;
+ align-items: center;
+ gap: 28px;
+}
+
+.brand {
+ display: flex;
+ align-items: center;
+ gap: 10px;
+ color: var(--ink-50);
+ text-decoration: none;
+}
+.brand-mark {
+ width: 26px;
+ height: 14px;
+ color: var(--orange-500);
+}
+.brand-name {
+ font-family: var(--font-caps);
+ font-size: 19px;
+ font-weight: 600;
+ letter-spacing: 0.09em;
+ text-transform: uppercase;
+ color: var(--ink-50);
+}
+.brand-tag {
+ font-family: var(--font-mono);
+ font-size: 11px;
+ color: var(--ink-500);
+ border: 1px solid var(--board-400);
+ border-radius: 3px;
+ padding: 1px 7px;
+ letter-spacing: 0.04em;
+}
+
+.tabnav {
+ display: flex;
+ gap: 4px;
+}
+.tabnav-item a {
+ font-family: var(--font-caps);
+ font-size: 13px;
+ letter-spacing: 0.05em;
+ text-transform: uppercase;
+ text-decoration: none;
+ color: var(--ink-300);
+ padding: 7px 12px;
+ display: inline-flex;
+ align-items: center;
+ gap: 7px;
+ border-radius: 4px;
+}
+.tabnav-item a:hover {
+ color: var(--ink-50);
+}
+.tabnav-item.active a {
+ color: var(--orange-400);
+ box-shadow: inset 0 -2px 0 var(--orange-500);
+}
+.tabnav-item a:focus-visible {
+ outline: 2px solid var(--orange-500);
+}
+
+.masthead-session {
+ margin-left: auto;
+ display: inline-flex;
+ align-items: center;
+ gap: 8px;
+}
+.masthead-session .mono {
+ font-family: var(--font-mono);
+ font-size: 11px;
+ color: var(--ink-500);
+}
+.masthead-session .ctl {
+ width: 7px;
+ height: 7px;
+ border-radius: 50%;
+ background: var(--moss-400);
+ box-shadow: 0 0 0 1px var(--board-950);
+}
+
+.stage {
+ padding: 26px 28px 48px;
+ max-width: 1180px;
+ margin: 0 auto;
+ width: 100%;
+}
+
+/* ---------- page head ---------- */
+
+.page-head {
+ display: flex;
+ align-items: baseline;
+ gap: 14px;
+ flex-wrap: wrap;
+}
+.page-title {
+ font-family: var(--font-caps);
+ font-size: 24px;
+ font-weight: 700;
+ letter-spacing: 0.07em;
+ text-transform: uppercase;
+ color: var(--ink-50);
+}
+.page-meta {
+ font-family: var(--font-mono);
+ font-size: 12px;
+ color: var(--ink-500);
+}
+.page-meta.hint {
+ color: var(--ink-700);
+}
+.mono-tag {
+ font-family: var(--font-mono);
+ font-size: 11px;
+ color: var(--ink-500);
+ border: 1px solid var(--board-400);
+ border-radius: 3px;
+ padding: 1px 7px;
+ background: var(--tissue-0);
+ letter-spacing: 0.03em;
+}
+.mono-tag.reconnecting {
+ color: var(--amber-400);
+ border-color: var(--amber-400);
+}
+.mono-tag.warn {
+ color: var(--amber-400);
+ border-color: var(--amber-400);
+ background: var(--tissue-0);
+}
+
+.page-head .sub {
+ font-family: var(--font-caps);
+ font-size: 24px;
+ font-weight: 400;
+ letter-spacing: 0.05em;
+ color: var(--ink-300);
+ margin-left: 10px;
+}
+
+.crumbs {
+ display: flex;
+ align-items: center;
+ gap: 6px;
+ margin-bottom: 14px;
+}
+.crumbs-link {
+ font-family: var(--font-caps);
+ font-size: 12px;
+ letter-spacing: 0.05em;
+ text-transform: uppercase;
+ color: var(--orange-400);
+ text-decoration: none;
+ display: inline-flex;
+ align-items: center;
+ gap: 6px;
+}
+.crumbs-link:hover {
+ color: var(--orange-500);
+}
+.page-actions {
+ margin-left: auto;
+ display: flex;
+ gap: 10px;
+ align-items: center;
+}
+
+/* ---------- daemon / status chips ---------- */
+
+.daemon-chip {
+ display: inline-flex;
+ align-items: center;
+ gap: 7px;
+ font-family: var(--font-mono);
+ font-size: 11px;
+ padding: 1px 8px;
+ border-radius: 3px;
+ border: 1px solid var(--board-400);
+ color: var(--ink-300);
+ background: var(--tissue-0);
+}
+.daemon-chip .dot {
+ width: 7px;
+ height: 7px;
+ border-radius: 50%;
+}
+.daemon-chip.up .dot {
+ background: var(--moss-400);
+}
+.daemon-chip.down .dot {
+ background: var(--rust-400);
+ box-shadow: 0 0 0 1px var(--rust-400);
+}
+.daemon-chip.up {
+ color: var(--moss-400);
+}
+.daemon-chip.down {
+ color: var(--rust-350);
+}
+
+.status-chip {
+ display: inline-flex;
+ align-items: center;
+ gap: 8px;
+}
+.status-chip .dot {
+ width: 8px;
+ height: 8px;
+ border-radius: 50%;
+}
+.status-chip .status-chip-label {
+ font-family: var(--font-mono);
+ font-size: 12px;
+ color: var(--ink-900);
+}
+.status-chip.up .dot {
+ background: var(--moss-400);
+}
+.status-chip.warn .dot {
+ background: var(--amber-400);
+}
+.status-chip.down .dot {
+ background: var(--rust-400);
+}
+
+/* ---------- the wall: tenant shelves + container end-labels ---------- */
+
+.wall {
+ margin-top: 18px;
+}
+.wall .p-datatable {
+ border: 1px solid var(--ink-300);
+ border-radius: 6px;
+ overflow: hidden;
+}
+.wall .p-datatable .p-datatable-thead {
+ display: none;
+} /* shelves carry the labels */
+
+/* Shelf band (datatable row-group header). PrimeVue paints this from its own
+   surface tokens (mid-tan #574531 in dark) — force ours so shelf-name cream
+   text stays readable. !important beats PrimeVue's runtime-injected styles. */
+.p-datatable-row-group-header,
+.p-datatable-row-group-header td,
+.p-datatable-group-header {
+ background: var(--board-700) !important;
+ color: var(--ink-50) !important;
+ border: 0;
+}
+.shelf {
+ display: flex;
+ align-items: center;
+ gap: 12px;
+ padding: 9px 14px 9px 12px;
+}
+.shelf .shelf-pull {
+ width: 3px;
+ align-self: stretch;
+ background: var(--orange-600);
+ border-radius: 1px;
+}
+.shelf .shelf-name {
+ font-family: var(--font-caps);
+ font-size: 15px;
+ font-weight: 700;
+ letter-spacing: 0.06em;
+ text-transform: uppercase;
+ color: var(--ink-50);
+}
+.shelf .shelf-uid {
+ font-family: var(--font-mono);
+ font-size: 11px;
+ color: var(--ink-300);
+}
+.shelf .shelf-hint {
+ margin-left: auto;
+ font-family: var(--font-mono);
+ font-size: 11px;
+ color: var(--ink-300);
+}
+
+.p-datatable-row {
+ background: var(--tissue-0);
+}
+.p-datatable-row.p-datatable-row-hover,
+.p-datatable-row:hover {
+ background: var(--tissue-50);
+}
+.cell-name {
+ font-family: var(--font-caps);
+ font-size: 14px;
+ font-weight: 600;
+ letter-spacing: 0.04em;
+ color: var(--ink-900);
+}
+.cell-name .c-id {
+ font-family: var(--font-mono);
+ font-size: 10px;
+ color: var(--ink-500);
+}
+.cell-image {
+ font-family: var(--font-mono);
+ font-size: 12px;
+ color: var(--ink-700);
+}
+.cell-ports {
+ font-family: var(--font-mono);
+ font-size: 12px;
+ color: var(--ink-700);
+}
+.cell-ports .port {
+ font-family: var(--font-mono);
+ color: var(--ink-900);
+}
+.cell-ports .arrow {
+ color: var(--orange-600);
+ margin: 0 3px;
+}
+.cell-empty {
+ font-family: var(--font-mono);
+ font-size: 12px;
+ color: var(--ink-500);
+ font-style: italic;
+}
+
+.row-arrow {
+ color: var(--ink-300);
+ width: 14px;
+ text-align: center;
+}
+.p-datatable-tbody .p-datatable-row:hover .row-arrow,
+.p-datatable-tbody .p-datatable-row.p-datatable-row-hover .row-arrow {
+ color: var(--orange-600);
+}
+
+.p-datatable-row .row-pull {
+ width: 3px;
+ height: 100%;
+ background: var(--orange-500);
+ opacity: 0;
+ transition: opacity 0.18s ease-out;
+}
+
+/* the box slides half out on hover */
+.p-datatable-tbody .p-datatable-row {
+ transition: background 0.18s ease-out;
+ position: relative;
+}
+.p-datatable-tbody .p-datatable-row:hover,
+.p-datatable-tbody .p-datatable-row.p-datatable-row-hover {
+ background: var(--tissue-100);
+ box-shadow: inset 3px 0 0 var(--orange-500);
+}
+.p-datatable-tbody .p-datatable-row td:first-child {
+ padding-left: 14px;
+}
+
+/* ---------- observability ---------- */
+
+.stat-strip {
+ display: flex;
+ flex-wrap: wrap;
+ gap: 12px;
+ margin-top: 16px;
+}
+.stat-chip {
+ background: var(--tissue-0);
+ border: 1px solid var(--ink-300);
+ border-radius: 6px;
+ padding: 10px 16px;
+ min-width: 132px;
+ display: flex;
+ flex-direction: column;
+ gap: 4px;
+}
+.stat-value {
+ font-family: var(--font-mono);
+ font-size: 19px;
+ color: var(--ink-900);
+}
+.stat-label {
+ font-family: var(--font-caps);
+ font-size: 10px;
+ letter-spacing: 0.08em;
+ text-transform: uppercase;
+ color: var(--ink-500);
+}
+
+.log-panel {
+ margin-top: 20px;
+}
+.log-panel-head {
+ display: flex;
+ align-items: center;
+ gap: 10px;
+}
+.log-panel-title {
+ font-family: var(--font-caps);
+ font-size: 13px;
+ letter-spacing: 0.07em;
+ text-transform: uppercase;
+ color: var(--ink-50);
+}
+.log-tools {
+ display: flex;
+ gap: 8px;
+ align-items: center;
+}
+.follow-toggle {
+ margin-left: auto;
+}
+
+.log-view {
+ background: var(--log-bg);
+ color: var(--log-fg);
+ border: 1px solid var(--hairline);
+ border-radius: 4px;
+ font-family: var(--font-mono);
+ font-size: 12.5px;
+ line-height: 1.55;
+ padding: 12px 16px;
+ margin-top: 8px;
+ max-height: 440px;
+ overflow-y: auto;
+ white-space: pre-wrap;
+ word-break: break-all;
+}
+.log-view .log-line {
+ min-height: 1.55em;
+}
+.log-empty {
+ color: var(--log-dim);
+ font-style: italic;
+}
+
+/* ---------- add domain ---------- */
+
+.domain-card {
+ background: var(--tissue-0);
+ border: 1px solid var(--ink-300);
+ border-radius: 8px;
+ padding: 22px 26px;
+ box-shadow: 0 1px 0 rgba(58, 36, 20, 0.18);
+ max-width: 560px;
+ display: flex;
+ flex-direction: column;
+ gap: 14px;
+}
+.domain-card h2 {
+ font-family: var(--font-caps);
+ font-size: 15px;
+ font-weight: 700;
+ letter-spacing: 0.06em;
+ text-transform: uppercase;
+ color: var(--ink-900);
+ margin: 0;
+}
+.domain-card .field {
+ display: flex;
+ flex-direction: column;
+ gap: 6px;
+}
+.domain-card .field-label {
+ font-family: var(--font-caps);
+ font-size: 10px;
+ letter-spacing: 0.08em;
+ text-transform: uppercase;
+ color: var(--ink-500);
+}
+.domain-card .row {
+ display: flex;
+ gap: 10px;
+ align-items: flex-end;
+}
+.domain-card .row .field {
+ flex: 1;
+}
+
+.form-error {
+ font-family: var(--font-mono);
+ font-size: 12px;
+ color: #a94420;
+ background: #fbe9e1;
+ border: 1px solid #e3b4a5;
+ border-radius: 4px;
+ padding: 7px 10px;
+}
+
+.form-ok {
+ font-family: var(--font-mono);
+ font-size: 12px;
+ color: var(--tissue-900);
+ background: var(--tissue-100);
+ border: 1px solid var(--moss-400);
+ border-radius: 4px;
+ padding: 7px 10px;
+ display: inline-flex;
+ align-items: center;
+ gap: 8px;
+}
+.form-ok .ok-check {
+ color: var(--moss-400);
+ font-size: 13px;
+}
+
+.domains-list {
+ margin-top: 24px;
+}
+.domains-list .p-datatable {
+ border: 1px solid var(--ink-300);
+ border-radius: 6px;
+ overflow: hidden;
+}
+.domains-list .p-datatable .p-datatable-thead .p-datatable-column-title {
+ font-family: var(--font-caps);
+ font-size: 10px;
+ letter-spacing: 0.07em;
+ text-transform: uppercase;
+ color: var(--ink-700);
+}
+
+/* ---------- empty / error states ---------- */
+
+.empty-state {
+ margin-top: 40px;
+ text-align: center;
+ color: var(--ink-500);
+ font-family: var(--font-caps);
+ font-size: 15px;
+ letter-spacing: 0.07em;
+ text-transform: uppercase;
+}
+.empty-state svg {
+ display: block;
+ margin: 0 auto 14px;
+ color: var(--board-500);
+}
+
+.error-band {
+ margin-top: 18px;
+ background: #2a1208;
+ border: 1px solid var(--rust-400);
+ color: #f3c9b8;
+ font-family: var(--font-mono);
+ font-size: 12.5px;
+ padding: 10px 14px;
+ border-radius: 5px;
+}
+
+/* ---------- motion, reduced ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+ .p-datatable-tbody .p-datatable-row {
+  transition: none;
+ }
+ a,
+ button {
+  transition: none;
+ }
+}
+
+/* ---------- PrimeVue chrome alignment ---------- */
+
+.p-component {
+ font-family: var(--font-body);
+}
+
+.p-dropdown {
+ font-family: var(--font-caps);
+ font-size: 13px;
+ letter-spacing: 0.03em;
+ text-transform: uppercase;
+}
+.p-dropdown .p-dropdown-label {
+ font-family: var(--font-caps);
+}
+
+.p-inputtext {
+ font-family: var(--font-mono);
+ font-size: 14px;
+ letter-spacing: 0.01em;
+ background: var(--tissue-50);
+ border: 1px solid var(--tissue-700);
+ border-radius: 4px;
+}
+
+.p-tabmenu {
+ background: transparent;
+ border-bottom: 1px solid var(--board-500);
+}
+
+/* prime toasts sit on the board exterior */
+.p-toast .p-toast-message {
+ background: var(--tissue-0);
+ border-color: var(--ink-300);
+}

@@ -42,8 +42,9 @@ test("validateDomain: accepts sane + wildcard domains, rejects garbage", () => {
   }
 });
 
-test("POST /api/domains → 201 persists a record; GET lists it", async () => {
-  const app = await makeApp();
+test("POST /api/domains → 201 persists a record; GET lists it", async (t) => {
+  const { app, close } = await makeApp();
+  t.after(close);
   const res = await app.inject({
     method: "POST",
     url: "/api/domains",
@@ -54,10 +55,8 @@ test("POST /api/domains → 201 persists a record; GET lists it", async () => {
   const rec = res.json();
   assert.equal(rec.domain, "shop.example");
   assert.equal(rec.user, "alice");
-  assert.ok(
-    rec.lastResult.startsWith("provisioned shop.example for alice"),
-    rec.lastResult,
-  );
+  assert.equal(rec.lastResult, "provisioned shop.example for alice");
+  assert.ok(rec.id);
 
   const list = await app.inject({
     method: "GET",
@@ -69,8 +68,9 @@ test("POST /api/domains → 201 persists a record; GET lists it", async () => {
   assert.equal(list.json()[0].id, rec.id);
 });
 
-test("POST duplicate domain → 409", async () => {
-  const app = await makeApp();
+test("POST duplicate domain → 409", async (t) => {
+  const { app, close } = await makeApp();
+  t.after(close);
   const first = await app.inject({
     method: "POST",
     url: "/api/domains",
@@ -87,8 +87,9 @@ test("POST duplicate domain → 409", async () => {
   assert.equal(dup.statusCode, 409);
 });
 
-test("POST invalid domain → 422", async () => {
-  const app = await makeApp();
+test("POST invalid domain → 422", async (t) => {
+  const { app, close } = await makeApp();
+  t.after(close);
   const res = await app.inject({
     method: "POST",
     url: "/api/domains",
@@ -98,27 +99,23 @@ test("POST invalid domain → 422", async () => {
   assert.equal(res.statusCode, 422);
 });
 
-test("POST unknown user → 422", async () => {
-  const app = await makeApp();
-  const res = await app.inject({
-    method: "POST",
-    url: "/api/domains",
-    headers: authHeaders,
-    payload: { domain: "x.example", user: "ghost" },
-  });
-  assert.equal(res.statusCode, 422);
-  // blocklisted users are not assignable either
-  const blocked = await app.inject({
-    method: "POST",
-    url: "/api/domains",
-    headers: authHeaders,
-    payload: { domain: "y.example", user: "mallory" },
-  });
-  assert.equal(blocked.statusCode, 422);
+test("POST unknown user → 422 (incl. blocklisted, which the agent never lists)", async (t) => {
+  const { app, close } = await makeApp();
+  t.after(close);
+  for (const user of ["ghost", "mallory"]) {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/domains",
+      headers: authHeaders,
+      payload: { domain: "x.example", user },
+    });
+    assert.equal(res.statusCode, 422, user);
+  }
 });
 
-test("script failure → 500 with output, nothing persisted", async () => {
-  const app = await makeApp();
+test("script failure → 500 with output, nothing persisted", async (t) => {
+  const { app, close } = await makeApp();
+  t.after(close);
   const old = process.env.EZ_PROVISION_EXIT;
   process.env.EZ_PROVISION_EXIT = "1";
   try {
@@ -131,7 +128,7 @@ test("script failure → 500 with output, nothing persisted", async () => {
     assert.equal(res.statusCode, 500);
     const body = res.json();
     assert.equal(body.error, "provisioning failed");
-    assert.match(body.output, /provisioned fail\.example for carol/); // argv order proof
+    assert.equal(body.output, "provisioned fail.example for carol");
   } finally {
     if (old === undefined) delete process.env.EZ_PROVISION_EXIT;
     else process.env.EZ_PROVISION_EXIT = old;
@@ -144,35 +141,51 @@ test("script failure → 500 with output, nothing persisted", async () => {
   assert.equal(list.json().length, 0);
 });
 
-test("unconfigured script → 500 with clear message", async () => {
-  const app = await makeApp({ provisionScript: "" });
-  const res = await app.inject({
-    method: "POST",
-    url: "/api/domains",
-    headers: authHeaders,
-    payload: { domain: "x.example", user: "alice" },
-  });
-  assert.equal(res.statusCode, 500);
-  assert.match(res.json().error, /PROVISION_SCRIPT/);
-});
-
-test("domains persist across app restarts (same DATA_DIR)", async () => {
+test("domains persist across app restarts (same DATA_DIR)", async (t) => {
   const tmp = await mkdtemp("/tmp/ezveploy-test-");
-  const app1 = await makeApp({ dataDir: tmp });
-  const first = await app1.inject({
+  const first = await makeApp({ dataDir: tmp });
+  t.after(first.close);
+  const res = await first.app.inject({
     method: "POST",
     url: "/api/domains",
     headers: authHeaders,
     payload: { domain: "persist.example", user: "bob" },
   });
-  assert.equal(first.statusCode, 201);
+  assert.equal(res.statusCode, 201);
 
-  const app2 = await makeApp({ dataDir: tmp });
-  const list = await app2.inject({
+  const second = await makeApp({ dataDir: tmp });
+  t.after(second.close);
+  const list = await second.app.inject({
     method: "GET",
     url: "/api/domains",
     headers: authHeaders,
   });
   assert.equal(list.json().length, 1);
   assert.equal(list.json()[0].domain, "persist.example");
+});
+
+test("agent down → 502, nothing persisted, reservation released", async (t) => {
+  const { app, close } = await makeApp({ agentUrl: "http://127.0.0.1:1" });
+  t.after(close);
+  const first = await app.inject({
+    method: "POST",
+    url: "/api/domains",
+    headers: authHeaders,
+    payload: { domain: "x.example", user: "alice" },
+  });
+  assert.equal(first.statusCode, 502);
+  // the in-flight reservation must have been released — not a 409
+  const second = await app.inject({
+    method: "POST",
+    url: "/api/domains",
+    headers: authHeaders,
+    payload: { domain: "x.example", user: "alice" },
+  });
+  assert.equal(second.statusCode, 502);
+  const list = await app.inject({
+    method: "GET",
+    url: "/api/domains",
+    headers: authHeaders,
+  });
+  assert.equal(list.json().length, 0);
 });

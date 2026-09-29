@@ -8,7 +8,7 @@ web — self-hosted admin dashboard, accessed over the LAN/internet through a TL
 
 ## Stack
 
-User decision (explicit): Node.js Fastify 5 API server (runs as root on the VPS, executes OS commands) + Vue 3 UI with PrimeVue 4 components. Same-origin in production (Fastify serves the built UI). No CORS dependency. Provisioning script lives on the VPS, invoked by path from env (`PROVISION_SCRIPT`).
+User decision (explicit): Node.js Fastify 5 as **two processes** — an **agent** that runs as root on the VPS and owns every OS-touching capability (passwd, per-user docker sockets, the provisioning script), and an **API gateway** that serves the UI and delegates to the agent over localhost — plus Vue 3 UI with PrimeVue 4 components. Same-origin in production (gateway serves the built UI). No CORS dependency. No docker/compose anywhere; both processes run bare on the box. Provisioning script lives on the VPS, invoked by path from the agent's env (`PROVISION_SCRIPT`).
 
 ## Users
 
@@ -26,8 +26,8 @@ The same box an admin already trusts — root access to the VPS — becomes the 
 
 - VPS root user; Node >= 22. Each tenant runs **rootless Docker** (one per-user daemon at `/run/user/<uid>/docker.sock`), plus `edgectl`-managed per-tenant edge nginx (see `~/Downloads/EDGECTL.md` on the dev machine).
 - Domains map at the front proxy: a VPS-side provisioning script turns `<domain>` into a mapping to `<user>`'s fixed edge port range.
-- The admin edits exactly two things on the VPS by hand: the server's `.env` (admin creds, script path) and the provisioning script itself. Everything else goes through the panel.
-- Dev happens on the admin's local machine; the repo is a monorepo (`server/` + `ui/`).
+- The admin edits exactly three things on the VPS by hand: `server/.env` (admin creds, agent URL + shared token), `agent/.env` (script path, shared token, blocklist), and the provisioning script itself. Everything else goes through the panel.
+- Dev happens on the admin's local machine; the repo is a monorepo (`agent/` + `server/` + `ui/`).
 
 ## Capabilities and Constraints
 
@@ -35,7 +35,7 @@ The same box an admin already trusts — root access to the VPS — becomes the 
 - Enumerate per-user daemons; group containers by owner. `daemon: up|down` per user. Root's own daemon included as the admin group.
 - Per-container observability: log tail (default 200 / max 2000 lines), live SSE log follow with reconnect, resource snapshot (`docker stats`). Scoped `:user/:name` (names are not unique across daemons).
 - Add domain: validate (strict domain regex, allowlist user), dedupe (stored + in-flight), execute provisioning script via argv array only, ~60s timeout, capture output. Persist successes to JSON atomically.
-- Basic auth (env creds, constant-time compare) on every route. Bind `127.0.0.1` by default. No shell-string interpolation anywhere; feature-flagged `DOCKER_BIN`/`PROVISION_SCRIPT` for tests.
+- Basic auth (env creds, constant-time compare) on every gateway route. Gateway → agent is a shared Bearer token (`AGENT_TOKEN`); the agent binds `127.0.0.1:3901` and is reachable from nowhere else. No shell-string interpolation anywhere; feature-flagged `DOCKER_BIN`/`PASSWD_FILE`/`PROVISION_SCRIPT` on the agent for tests.
 - Explicitly undecided: whether the containers page also surfaces each tenant's edge port (a candidate column; user said "can be added anytime").
 - Out of scope (confirmed): container start/stop/restart/exec, metrics history/graphing, multi-container log aggregation, user CRUD, RBAC, TLS termination in this repo.
 
@@ -53,7 +53,7 @@ None provided. Product name used in-repo: EZVeploy. No voice, logo, or palette c
 
 1. Read-only where possible: containers and logs are observed, never mutated through the panel.
 2. One source of truth per concern: OS accounts for users, per-user daemons for containers, JSON registry for domains, the VPS script for domain provisioning.
-3. Root blast radius is the client's own; keep the command surface minimal, validated, and argv-scoped (never shell-interpolated).
+3. Root blast radius is the client's own; keep the command surface minimal, validated, and argv-scoped (never shell-interpolated). The agent is the only process with OS access — the gateway cannot reach the box.
 4. The panel stays dumb about provisioning mechanics; the script remains the single extension point the user edits on the box.
 
 ## Accessibility & Inclusion

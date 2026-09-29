@@ -4,11 +4,13 @@
   "private": true,
   "description": "Root panel over per-user rootless Docker daemons on a multi-tenant VPS",
   "workspaces": [
+    "agent",
     "server",
     "ui"
   ],
   "scripts": {
-    "test": "npm -C server test",
+    "test": "npm -C agent test && npm -C server test",
+    "dev:agent": "npm -C agent start",
     "dev:server": "npm -C server start",
     "dev:ui": "npm -C ui run dev",
     "build": "npm -C ui run build"

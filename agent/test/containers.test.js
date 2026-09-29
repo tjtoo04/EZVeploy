@@ -2,11 +2,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { makeApp, authHeaders } from "./helpers.js";
 
-test("GET /api/containers → per-user daemon states + containers with owner", async () => {
+test("GET /containers → per-user daemon states + containers with owner", async () => {
     const app = await makeApp();
     const res = await app.inject({
         method: "GET",
-        url: "/api/containers",
+        url: "/containers",
         headers: authHeaders,
     });
     assert.equal(res.statusCode, 200);
@@ -38,12 +38,12 @@ test("GET /api/containers → per-user daemon states + containers with owner", a
     assert.deepEqual(db.ports, [{ internal: "5432", proto: "tcp" }]);
 });
 
-test("GET /api/containers → container names are NOT unique across daemons", async () => {
+test("GET /containers → container names are NOT unique across daemons", async () => {
     // Regression guard for the architecture: two tenants may both run "web".
     const app = await makeApp();
     const res = await app.inject({
         method: "GET",
-        url: "/api/containers",
+        url: "/containers",
         headers: authHeaders,
     });
     const { containers } = res.json();

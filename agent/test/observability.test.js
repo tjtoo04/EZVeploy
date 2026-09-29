@@ -6,7 +6,7 @@ test("GET logs → 200 text for a known container", async () => {
   const app = await makeApp();
   const res = await app.inject({
     method: "GET",
-    url: "/api/containers/alice/web/logs",
+    url: "/containers/alice/web/logs",
     headers: authHeaders,
   });
   assert.equal(res.statusCode, 200);
@@ -18,7 +18,7 @@ test("GET logs → 404 for a missing container (daemon up)", async () => {
   const app = await makeApp();
   const res = await app.inject({
     method: "GET",
-    url: "/api/containers/alice/nope/logs",
+    url: "/containers/alice/nope/logs",
     headers: authHeaders,
   });
   assert.equal(res.statusCode, 404);
@@ -29,7 +29,7 @@ test("GET logs → 404 for unknown user", async () => {
   const app = await makeApp();
   const res = await app.inject({
     method: "GET",
-    url: "/api/containers/ghost/web/logs",
+    url: "/containers/ghost/web/logs",
     headers: authHeaders,
   });
   assert.equal(res.statusCode, 404);
@@ -39,7 +39,7 @@ test("GET logs → 404 for an invalid container name (traversal shape)", async (
   const app = await makeApp();
   const res = await app.inject({
     method: "GET",
-    url: "/api/containers/alice/..%2Fetc%2Fpasswd/logs",
+    url: "/containers/alice/..%2Fetc%2Fpasswd/logs",
     headers: authHeaders,
   });
   assert.equal(res.statusCode, 404);
@@ -49,7 +49,7 @@ test("GET stats → 200 with parsed numeric CPU/MEM", async () => {
   const app = await makeApp();
   const res = await app.inject({
     method: "GET",
-    url: "/api/containers/alice/web/stats",
+    url: "/containers/alice/web/stats",
     headers: authHeaders,
   });
   assert.equal(res.statusCode, 200);
@@ -63,7 +63,7 @@ test("GET stats → 404 for missing container", async () => {
   const app = await makeApp();
   const res = await app.inject({
     method: "GET",
-    url: "/api/containers/alice/nope/stats",
+    url: "/containers/alice/nope/stats",
     headers: authHeaders,
   });
   assert.equal(res.statusCode, 404);
@@ -73,7 +73,7 @@ test("logs lines=N is clamped to [1, 2000]", async () => {
   const app = await makeApp();
   const res = await app.inject({
     method: "GET",
-    url: "/api/containers/alice/web/logs?lines=999999",
+    url: "/containers/alice/web/logs?lines=999999",
     headers: authHeaders,
   });
   assert.equal(res.statusCode, 200);
@@ -83,7 +83,7 @@ test("SSE stream → error event for missing container, then closes", async () =
   const app = await makeApp();
   const res = await app.inject({
     method: "GET",
-    url: "/api/containers/alice/nope/logs/stream",
+    url: "/containers/alice/nope/logs/stream",
     headers: authHeaders,
   });
   assert.match(res.headers["content-type"] ?? "", /text\/event-stream/);
@@ -95,7 +95,7 @@ test("SSE stream → log events for a live container", async () => {
   const app = await makeApp();
   const res = await app.inject({
     method: "GET",
-    url: "/api/containers/alice/web/logs/stream",
+    url: "/containers/alice/web/logs/stream",
     headers: authHeaders,
   });
   assert.match(res.headers["content-type"] ?? "", /text\/event-stream/);

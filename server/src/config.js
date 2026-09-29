@@ -2,8 +2,9 @@ import { resolve } from "node:path";
 
 /**
  * Load configuration from the environment.
- * Every external system is injectable for tests: DOCKER_BIN, PROVISION_SCRIPT,
- * PASSWD_FILE, DATA_DIR.
+ * The server is now a pure HTTP gateway: it owns auth, the domain registry,
+ * and the static UI, and delegates every OS-touching capability to the VPS
+ * agent (see agent/) over AGENT_URL. Data stays injectable for tests (DATA_DIR).
  */
 export function loadConfig(env = process.env) {
   return {
@@ -13,15 +14,9 @@ export function loadConfig(env = process.env) {
     adminPassword: env.ADMIN_PASSWORD || "change-me",
     // Resolve relative DATA_DIR against cwd (server runs from server/).
     dataDir: resolve(env.DATA_DIR || "./data"),
-    provisionScript: env.PROVISION_SCRIPT || "",
-    userBlocklist: (env.USER_BLOCKLIST || "")
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean),
-    dockerBin: env.DOCKER_BIN || "docker",
-    passwdFile: env.PASSWD_FILE || "/etc/passwd",
-    // True when pointed at the test fixtures — the API says so, the UI can
-    // label the data honestly (SPEC: demonstration data is marked synthetic).
-    fixtureMode: Boolean(env.DOCKER_BIN && env.DOCKER_BIN !== "docker"),
+    // The VPS agent — localhost-only, Bearer-token protected.
+    agentUrl: env.AGENT_URL || "http://127.0.0.1:3901",
+    // Must match AGENT_TOKEN in the agent's .env.
+    agentToken: env.AGENT_TOKEN || "",
   };
 }

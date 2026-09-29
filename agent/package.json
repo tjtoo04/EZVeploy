@@ -1,0 +1,15 @@
+{
+  "name": "ezveploy-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "EZVeploy VPS agent — the only process that touches the OS (docker daemons, /etc/passwd, the provisioning script)",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/index.js",
+    "test": "node --test \"test/*.test.js\""
+  },
+  "dependencies": {
+    "fastify": "^5.0.0"
+  }
+}

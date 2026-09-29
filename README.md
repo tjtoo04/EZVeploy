@@ -15,29 +15,44 @@ Three pages, no SSH required:
   provisioning script; the registry is persisted and deduplicated.
 
 ```
-server/   Fastify 5 API (runs as root, executes OS commands)
+agent/    the VPS agent — the ONLY process that touches the OS (docker daemons,
+          /etc/passwd, the provisioning script). Runs as root on 127.0.0.1:3901.
+server/   the API gateway — Basic auth, domain registry, the built UI. Never
+          runs an OS command; talks to the agent over localhost. 127.0.0.1:3900.
 ui/       Vue 3 + PrimeVue 4
 tools/    headless-verify helpers (shot-proxy, WebDriver drivers)
 ```
 
-The API runs on one port, serves the built UI, and speaks Basic auth — no CORS,
-one process, one reverse-proxy target in production.
+Two processes, one trust boundary: the browser talks to `server` (Basic auth),
+`server` talks to `agent` (Bearer token, `http://127.0.0.1:3901`), and only
+`agent` talks to the OS. Nothing is containerized — the agent runs bare on the
+box because it has to see `/etc/passwd`, the per-user docker sockets, and the
+provisioning script's side effects (nginx configs, certs).
 
 ---
 
 ## Quickstart (dev)
 
+Three processes, three terminals:
+
 ```bash
-# backend against the test fixtures (real-looking daemons, no docker needed)
-cd server
+# terminal 1 — the VPS agent against the test fixtures (real-looking daemons,
+# no docker needed). Fixture mode shows a "fixture data" tag in the UI.
+cd agent
 DOCKER_BIN=test/fixtures/docker \
 PASSWD_FILE=test/fixtures/passwd \
 PROVISION_SCRIPT=test/fixtures/provision-domain.sh \
-ADMIN_USER=admin ADMIN_PASSWORD=secret PORT=3900 DATA_DIR=./data-dev \
-node src/index.js
+AGENT_TOKEN=dev-token \
+node src/index.js                       # → http://127.0.0.1:3901
 
-# frontend (another terminal)
-cd ui && npm install && npm run dev      # → http://localhost:5173 (admin/secret)
+# terminal 2 — the API server (gateway)
+cd server
+AGENT_URL=http://127.0.0.1:3901 AGENT_TOKEN=dev-token \
+ADMIN_USER=admin ADMIN_PASSWORD=secret PORT=3900 DATA_DIR=./data-dev \
+node src/index.js                       # → http://127.0.0.1:3900
+
+# terminal 3 — the frontend
+cd ui && npm install && npm run dev     # → http://localhost:5173 (admin/secret)
 ```
 
 Vite proxies `/api` to the Fastify server. `tools/shot-proxy.mjs` + `tools/shot.py`
@@ -46,28 +61,69 @@ render the pages in headless chromium for visual checks.
 ### Tests
 
 ```bash
-npm test          # server: 28 tests, node:test, no extra framework
+npm test          # both suites: agent (OS seam via fixtures) + server (fake agent, hermetic)
 ```
 
-Tests use **fixtures for the OS seam** (SPEC, Testing Decisions): `DOCKER_BIN`
-and `PROVISION_SCRIPT` point at scripts that simulate per-user daemons and a
-provisioning script, asserting the exact argv the server passes.
+- **agent** — the OS-level tests: passwd filtering, per-user daemon states,
+  container listing, logs/stats/SSE, provisioning argv order, token auth.
+  Uses the fixture seam (`DOCKER_BIN`, `PASSWD_FILE`, `PROVISION_SCRIPT`).
+- **server** — the gateway tests: Basic auth, domain validation/dedupe/
+  persistence, and proxying against an in-process fake agent (no OS calls).
 
 ---
 
 ## Deploying on the VPS (root)
 
-Requirements: Node ≥ 22, the `docker` CLI, one provisioned domain for the panel.
+Requirements: Node ≥ 22 and the `docker` CLI on the host (the agent shells out
+to it), one provisioned domain for the panel.
 
 ```bash
 # 1. get the code
 cd /opt && git clone <your-repo-url> ezveploy && cd ezveploy
 
-# 2. build the UI, then copy the env file
+# 2. build the UI, then create the two env files
 cd ui && npm install && npm run build
-cd .. && cp .env.example server/.env
+cd ..
+cp server/.env.example server/.env     # → /opt/ezveploy/server/.env
+cp agent/.env.example agent/.env       # → /opt/ezveploy/agent/.env
+```
 
-# 3. SYSTEMD UNIT — the only files you edit on the box
+### Where the .env files go (exactly two, plus the script)
+
+| File | Holds |
+|------|-------|
+| **`/opt/ezveploy/server/.env`** | `ADMIN_USER` / `ADMIN_PASSWORD` (browser login), `AGENT_URL` / `AGENT_TOKEN` |
+| **`/opt/ezveploy/agent/.env`** | `AGENT_TOKEN` (**same value as server's**), `PROVISION_SCRIPT`, `USER_BLOCKLIST` |
+| the provisioning script itself | e.g. `/opt/ezveploy/provision-domain.sh` — owned by you, **never shipped** |
+
+Generate both tokens with `openssl rand -base64 24`. `AGENT_TOKEN` must be
+identical in the two files — it is how the server proves itself to the agent.
+
+> **Moving from the single-server setup:** `server/.env` loses
+> `PROVISION_SCRIPT`, `USER_BLOCKLIST`, `DOCKER_BIN`, `PASSWD_FILE` (those now
+> live in `agent/.env`); add `AGENT_URL` and `AGENT_TOKEN`. Then create
+> `agent/.env` from `agent/.env.example` and set `AGENT_TOKEN`, `PROVISION_SCRIPT`,
+> `USER_BLOCKLIST`.
+
+### SYSTEMD UNITS — agent first, then the server
+
+`/etc/systemd/system/ezveploy-agent.service`:
+
+```ini
+[Unit]
+Description=EZVeploy VPS agent
+After=docker.service network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/ezveploy/agent
+EnvironmentFile=/opt/ezveploy/agent/.env
+ExecStart=/usr/bin/node src/index.js
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
 ```
 
 `/etc/systemd/system/ezveploy.service`:
@@ -75,7 +131,8 @@ cd .. && cp .env.example server/.env
 ```ini
 [Unit]
 Description=EZVeploy admin panel
-After=docker.service network.target
+After=ezveploy-agent.service network.target
+Requires=ezveploy-agent.service
 
 [Service]
 Type=simple
@@ -90,15 +147,12 @@ WantedBy=multi-user.target
 ```
 
 ```bash
-systemctl daemon-reload && systemctl enable --now ezveploy
+systemctl daemon-reload && systemctl enable --now ezveploy-agent ezveploy
 ```
 
-### Where to edit on the VPS (exactly two things)
-
-1. **`/opt/ezveploy/server/.env`** — `ADMIN_USER` / `ADMIN_PASSWORD`
-   (`openssl rand -base64 24`), and `PROVISION_SCRIPT` pointing at your script.
-2. **The provisioning script itself** (e.g. `/opt/ezveploy/provision-domain.sh`)
-   — owned by you, written by you, **never shipped in this repo**.
+The server starts before the agent, requests simply get a 502 (and a
+"reconnecting" state in the UI) until the agent answers — it restarts on its
+own, no wiring needed.
 
 ### Provisioning script contract
 
@@ -119,40 +173,54 @@ echo "imported <domain> → <user>"      # stdout = the summary shown in the UI
 
 ### Exposing it
 
-Keep `HOST=127.0.0.1`. Put a TLS reverse proxy in front (nginx/caddy) that
-terminates HTTPS and proxies to `127.0.0.1:3900`. The panel's auth is HTTP
-Basic, handled by the browser — the proxy must **not** add its own auth.
+Keep `HOST=127.0.0.1` on **both** servers. Put a TLS reverse proxy in front
+(nginx/caddy) that terminates HTTPS and proxies to `127.0.0.1:3900`. The
+panel's auth is HTTP Basic, handled by the browser — the proxy must **not**
+add its own auth.
 
 ---
 
 ## How it works
 
-- **Users** — one source of truth: `/etc/passwd` (`uid ≥ 1000`, home under
-  `/home/`, `USER_BLOCKLIST` to hide tenants). Root is always present as the
-  panel's own "admin" group.
-- **Containers** — for each user, `docker --host unix:///run/user/<uid>/docker.sock ps
-  --format "{{json .}}"` (root can address any user's rootless socket). Root's
-  own daemon is `/var/run/docker.sock`. A failed ps = "daemon down".
-  Container names are **not unique across daemons** — every reference carries
-  its user (`/containers/:user/:name`).
-- **Observability** — `docker logs --tail N` (200/2000 caps), SSE live-follow
-  (`docker logs -f`) with client-disconnect kill + 1s reconnect, and one-shot
-  `docker stats --no-stream --format json` snapshots. No metrics history.
-- **Domains** — JSON registry (`DATA_DIR/domains.json`, atomic writes),
-  deduplicated against stored + in-flight names. Validation is strict and
-  mirrored client-side; every command runs as an **argv array**, never a shell
-  string.
-- **Auth** — HTTP Basic (constant-time compare) on every route including
-  static assets, so the browser's native credential prompt handles login and
-  `fetch`/`EventSource` inherit it automatically.
+- **Two servers, one boundary.** `agent/` owns `/etc/passwd` (users, `uid ≥
+  1000`, home under `/home/`, `USER_BLOCKLIST`; root is always present as the
+  panel's own "admin" group), the per-user daemon sockets, `docker ps`, and
+  every logs/stats/stream command. `server/` owns the browser-facing API —
+  Basic auth on every route including static assets — and the domain registry.
+  The server never runs a command; it calls the agent's REST API with a Bearer
+  token and validates every user/name against the agent's allowlist first.
+- **Containers** — for each user, the agent runs `docker --host
+  unix:///run/user/<uid>/docker.sock ps --format "{{json .}}"` (root can
+  address any user's rootless socket). Root's own daemon is
+  `/var/run/docker.sock`. A failed ps = "daemon down". Container names are
+  **not unique across daemons** — every reference carries its user
+  (`/containers/:user/:name`).
+- **Observability** — agent-side `docker logs --tail N` (200/2000 caps), SSE
+  live-follow (`docker logs -f`) with client-disconnect kill + 1s reconnect,
+  and one-shot `docker stats --no-stream --format json` snapshots. The server
+  proxies the SSE stream through the same `/api/...` URL, so the UI's
+  `EventSource` never knows the agent exists. No metrics history.
+- **Domains** — JSON registry (`DATA_DIR/domains.json`, atomic writes) in the
+  server; deduplicated against stored + in-flight names; the agent runs the
+  script and reports `{ code, output, timedOut }`; the server persists only on
+  `code 0`. Validation is strict and mirrored client-side; every command runs
+  as an **argv array**, never a shell string.
+- **Auth** — HTTP Basic (constant-time compare) on every server route, so the
+  browser's native credential prompt handles login and `fetch`/`EventSource`
+  inherit it automatically. Server → agent is a Bearer token (constant-time
+  compare too), shared via the two `.env` files. The agent binds
+  `127.0.0.1:3901` — it has no reason to be reachable beyond the box.
 
 ## Security notes
 
-- Runs as root: keep it localhost-only behind TLS, give the password real
-  entropy, and treat the provisioning script as the **only** command surface.
+- Both processes run as root: keep them localhost-only behind TLS, give the
+  passwords real entropy, and treat the provisioning script as the **only**
+  command surface. The agent's token is the key between the two — keep it out
+  of the UI at all times.
 - No shell ever receives user input: usernames are allowlisted from passwd,
   container names match Docker's own `[A-Za-z0-9][A-Za-z0-9_.-]*` shape, and
-  domains pass a strict regex before touching the script.
+  domains pass a strict regex before touching the script. The server and the
+  agent each validate independently at their own boundary.
 
 ## Out of scope (deliberately)
 

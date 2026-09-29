@@ -28,11 +28,11 @@ test("socketPathFor: root → system socket, tenants → per-uid rootless socket
   );
 });
 
-test("GET /api/users → the fixture user list", async () => {
+test("GET /users → the fixture user list", async () => {
   const app = await makeApp();
   const res = await app.inject({
     method: "GET",
-    url: "/api/users",
+    url: "/users",
     headers: authHeaders,
   });
   assert.equal(res.statusCode, 200);

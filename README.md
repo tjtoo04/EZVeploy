@@ -74,26 +74,32 @@ npm test          # both suites: agent (OS seam via fixtures) + server (fake age
 
 ## Deploying on the VPS (root)
 
-Requirements: Node ≥ 22 and the `docker` CLI on the host (the agent shells out
-to it), one provisioned domain for the panel.
+Requirements: Node ≥ 22 with npm, installed system-wide (the systemd units
+below expect `/usr/bin/node`), the `docker` CLI on the host (the agent shells
+out to it), and one provisioned domain for the panel.
 
 ```bash
-# 1. get the code
-cd /opt && git clone <your-repo-url> ezveploy && cd ezveploy
+# 1. get the code (as root → /root/EZVeploy)
+cd ~ && git clone <your-repo-url> EZVeploy && cd EZVeploy
 
-# 2. build the UI, then create the two env files
-cd ui && npm install && npm run build
-cd ..
-cp server/.env.example server/.env     # → /opt/ezveploy/server/.env
-cp agent/.env.example agent/.env       # → /opt/ezveploy/agent/.env
+# 2. install all workspaces (agent, server, ui), build the UI,
+#    then create the two env files
+npm ci
+npm run build
+cp server/.env.example server/.env     # → /root/EZVeploy/server/.env
+cp agent/.env.example agent/.env       # → /root/EZVeploy/agent/.env
+chmod 600 server/.env agent/.env
 ```
+
+The agent and server are plain JS — no build step, they only need `npm ci`.
+Only the UI is built (Vite).
 
 ### Where the .env files go (exactly two, plus the script)
 
 | File | Holds |
 |------|-------|
-| **`/opt/ezveploy/server/.env`** | `ADMIN_USER` / `ADMIN_PASSWORD` (browser login), `AGENT_URL` / `AGENT_TOKEN` |
-| **`/opt/ezveploy/agent/.env`** | `AGENT_TOKEN` (**same value as server's**), `PROVISION_SCRIPT`, `USER_BLOCKLIST` |
+| **`/root/EZVeploy/server/.env`** | `ADMIN_USER` / `ADMIN_PASSWORD` (browser login), `AGENT_URL` / `AGENT_TOKEN` |
+| **`/root/EZVeploy/agent/.env`** | `AGENT_TOKEN` (**same value as server's**), `PROVISION_SCRIPT`, `USER_BLOCKLIST` |
 | the provisioning script itself | e.g. `/opt/ezveploy/provision-domain.sh` — owned by you, **never shipped** |
 
 Generate both tokens with `openssl rand -base64 24`. `AGENT_TOKEN` must be
@@ -107,6 +113,9 @@ identical in the two files — it is how the server proves itself to the agent.
 
 ### SYSTEMD UNITS — agent first, then the server
 
+systemd does not expand `~`, so the units use absolute paths. `ExecStart`
+must match `which node` on your box.
+
 `/etc/systemd/system/ezveploy-agent.service`:
 
 ```ini
@@ -116,8 +125,8 @@ After=docker.service network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/opt/ezveploy/agent
-EnvironmentFile=/opt/ezveploy/agent/.env
+WorkingDirectory=/root/EZVeploy/agent
+EnvironmentFile=/root/EZVeploy/agent/.env
 ExecStart=/usr/bin/node src/index.js
 Restart=on-failure
 RestartSec=3
@@ -136,8 +145,8 @@ Requires=ezveploy-agent.service
 
 [Service]
 Type=simple
-WorkingDirectory=/opt/ezveploy/server
-EnvironmentFile=/opt/ezveploy/server/.env
+WorkingDirectory=/root/EZVeploy/server
+EnvironmentFile=/root/EZVeploy/server/.env
 ExecStart=/usr/bin/node src/index.js
 Restart=on-failure
 RestartSec=3
